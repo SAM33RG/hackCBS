@@ -20,8 +20,19 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.atsera.hackcbs.Models.ResponseforLogin;
+import com.atsera.hackcbs.Models.Rfid;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+
+import retrofit2.Response;
+import retrofit2.adapter.rxjava.HttpException;
+import rx.android.schedulers.AndroidSchedulers;
+import rx.schedulers.Schedulers;
+import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -34,8 +45,9 @@ public class MainActivity extends AppCompatActivity {
     Context context;
 
     TextView tvNFCContent;
-    TextView message;
-    Button btnWrite;
+
+    private CompositeSubscription mSubscriptions;
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -44,6 +56,10 @@ public class MainActivity extends AppCompatActivity {
         context = this;
 
         tvNFCContent = (TextView) findViewById(R.id.nfc_contents);
+        tvNFCContent.setText("No card");
+
+        mSubscriptions = new CompositeSubscription();
+
 
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this);
@@ -61,9 +77,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    /******************************************************************************
-     **********************************Read From NFC Tag***************************
-     ******************************************************************************/
+
 
     private String ByteArrayToHexString(byte [] inarray) {
         int i, j, in;
@@ -80,22 +94,79 @@ public class MainActivity extends AppCompatActivity {
         return out;
     }
 
-
     private void readFromIntent(Intent intent) {
         Toast.makeText(getApplicationContext(), " " + "f1", Toast.LENGTH_SHORT).show();
         String action = intent.getAction();
         if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action)
                 || NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)
                 || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
-            tvNFCContent.setText("NFC Tag\n" + ByteArrayToHexString(getIntent().getByteArrayExtra(NfcAdapter.EXTRA_ID)));
+            String text =  ByteArrayToHexString(getIntent().getByteArrayExtra(NfcAdapter.EXTRA_ID));
+
+            sendId(text);
+            tvNFCContent.setText("NFC Tag Found and sent to Doc");
         }
 
     }
 
 
 
+    void sendId (String text){
+        mSubscriptions.add(NetworkUtil.getRetrofit().rfid(new Rfid(text))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeOn(Schedulers.io())
+                .subscribe(this::handleResponse,this::handleError));
+    }
+
+    private void handleResponse(ResponseforLogin response) {
+
+        Log.d("respone",response.toString());
 
 
+        try{
+            if (response.getCode() == 1){
+
+                Toast.makeText(getApplicationContext(), "Data sent to doctor" , Toast.LENGTH_SHORT).show();
+
+            }else if(response.getCode() == 2){
+
+                Toast.makeText(getApplicationContext(), "Data not available please give data", Toast.LENGTH_SHORT).show();
+
+
+            }
+        }catch (Exception e){
+            Toast.makeText(getApplicationContext(),"error\nreinstall app or contact developer",Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(),e.getMessage().toString(),Toast.LENGTH_SHORT).show();
+
+        }
+
+    }
+    private void handleError(Throwable error) {
+
+        Log.d("error77",error.getMessage());
+
+
+        if (error instanceof HttpException) {
+
+            Gson gson = new GsonBuilder().create();
+
+            try {
+
+                if(((HttpException) error).code()==401){
+
+                }
+                else {
+                    String errorBody = ((HttpException) error).response().errorBody().string();
+                    Response response = gson.fromJson(errorBody,Response.class);
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+
+            Log.e("error77",error.getMessage());
+        }
+    }
 
     @Override
     protected void onNewIntent(Intent intent) {
