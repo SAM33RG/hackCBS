@@ -2,6 +2,7 @@ package com.atsera.hackcbs;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -72,6 +73,9 @@ public class Login extends AppCompatActivity {
             }else if(response.getCode() == 2){
 
                 Toast.makeText(getApplicationContext(), "2" + response.getMessage(), Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(Login.this, MainActivity.class);
+                startActivity(intent);
+                finish();
 
             }
         }catch (Exception e){
